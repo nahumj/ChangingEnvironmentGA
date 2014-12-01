@@ -68,6 +68,9 @@ def wrap_around(value):
     return value
 
 def create_random_genotype():
+    assert (LENGTH is not None and 
+            RANGE_MIN is not None and 
+            RANGE_MAX is not None), "Module variable must be initialized before use"
     genotype = []
     for _ in range(LENGTH):
         genotype.append(random.uniform(RANGE_MIN, RANGE_MAX))
