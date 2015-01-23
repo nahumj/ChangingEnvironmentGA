@@ -1,4 +1,4 @@
-from math import floor, sqrt, ceil
+from math import floor, sqrt, ceil, cos, sin, fabs
 import numpy as np
 import scipy.interpolate
 import scipy.stats as stats
@@ -11,14 +11,18 @@ solution = [2,2]
 f = Fitness_Function(sphere_function, 0, 2)
 fitness = f.evaluate(solution)
 """
-MUTATION_EFFECT_SIZE = None
+MUTATION_EFFECT_SIZE = 50#None
 MOD_SAMPLES = 32.0 #How sparse should the set of refernce points be
 CHANGE_MODIFIER = 50.0 #cludgey multiplier to get environment 2 to be in 
                        #the right ball-park of similarity to environment 1
+RANA_WEIGHTS = None #somehow we need to give a constant set of weights to 
+                    #the Rana function
 
 def main():
     ff = Fitness_Function(sphere_function, 0, 2)
-    ff.transform(-1)
+    ff.create_fitness2(.8)
+    for i in range(10):
+        print ff.correlation(5000)
     #print fitness2([1,1])
     #plotFitnessFunction(ff.fitness1)
     #plotFitnessFunction(ff.fitness2)
@@ -49,6 +53,64 @@ def rosenbrock_function(vals, modgen):
         total += 100*(vals[i+1] - vals[i]**2)**2 + (vals[i]-1)**2
     return total
 
+def rana_function(vals, modgen):
+
+    total = 0.0
+    for i in range(len(vals)):
+        x = vals[i]
+        if i == len(vals) - 1:
+            y = vals[0]
+        else:
+            y = vals[i+1]
+
+        if modgen != None:
+            x += modgen(vals[i])
+            y += modgen(vals[i])
+
+        #Equation from 
+        #http://www.cs.unm.edu/~neal.holts/dga/benchmarkFunction/rana.html
+        total += RANA_WEIGHTS[i]*x*sin(sqrt(fabs(y+1-x)))* \
+                 cos(sqrt(fabs(x+y+1))) + (y+1)*cos(sqrt(fabs(y+1-x)))* \
+                 sin(sqrt(fabs(x+y+1)))
+    return total
+
+def schafferF7(vals, modgen):
+    #Equation from 
+    #http://www.cs.unm.edu/~neal.holts/dga/benchmarkFunction/schafferf7.html
+    total = 0.0
+    normalizer = 1.0/float(len(vals))
+    if modgen != None:
+        for i in range(len(vals)):
+            vals[i] += modgen(vals[i])
+    for i in range(len(vals)-1):
+        si = sqrt(vals[i]**2 + vals[i+1]**2)
+        total += (normalizer * sqrt(si) * (sin(50*si**0.20) + 1))**2
+    return total
+
+def deceptive(vals, modgen):
+    #Adapted from: http://www.cs.unm.edu/~neal.holts/dga/
+    #benchmarkFunction/deceptive.html
+    deceptiveness = 0.20 #This is actually more like the 
+                    #inverse of deceptiveness since smaller = more deceptive.
+    best_fitness = 1.0
+    deceptive_best = 0.7
+    if modgen != None:
+        for i in range(len(vals)):
+            vals[i] += modgen(vals[i])
+    total = 0.0
+    dimensions = len(vals)
+    for i in range(dimensions):
+        if vals[i] < deceptiveness:
+            #Then fitness value is on a negative slope with a y
+            #intercept at 1
+            total += vals[i]*(-1.0/deceptiveness) \
+			+ best_fitness
+        else:
+            #Otherwise, the fitness value is on a positive slope
+            #with an x intercept at deceptiveness
+            total += (vals[i]-deceptiveness)* \
+                       (deceptive_best/(1.0-deceptiveness))
+    return total/float(dimensions)
 
 class Fitness_Function:
 
@@ -61,6 +123,11 @@ class Fitness_Function:
         self.range_ = (-512, 512)
         self.flipped = False
         self.corr = None
+        
+        global RANA_WEIGHTS
+        RANA_WEIGHTS = [random.random() for i in range(arglen)]
+        total = sum(RANA_WEIGHTS)
+        RANA_WEIGHTS = [i/total for i in RANA_WEIGHTS]
 
         def f1(vals):
             return self.func(vals, None)
@@ -82,7 +149,7 @@ class Fitness_Function:
             raise AssertionError("Need to initialize fitness2 first")
         return self.fitness2(solution)
 
-    def correlation(self, samples=100):
+    def correlation(self, samples=5000):
         vals1 = []
         vals2 = []
         for i in range(samples):

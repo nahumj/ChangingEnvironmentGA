@@ -25,6 +25,7 @@ TOURNAMENT_SIZE = None
 VERBOSE = False
 ALTERNATE_ENVIRONMENT_CORR = None
 START_TIME = None
+CROWDING = False
 
 def create_initial_population():
     population = []
@@ -47,28 +48,45 @@ def get_mutated_population(population):
             new_population.append(org)
     return new_population
 
-def get_selected_population_soft(population, environment):
+def get_selected_population(population, environment):
     new_population = []
     for _ in range(NUMBER_OF_ORGANISMS):
         orgs = [random.choice(population) for _ in range(TOURNAMENT_SIZE)]
         new_population.append(get_best_organism(orgs, environment))
     return new_population
 
+def get_crowded_population(mutated_population, old_population, environment):
+    new_population = []
+    for org in mutated_population:
+        sample = [random.choice(old_population) for _ in range(TOURNAMENT_SIZE)]
+        new_population.append(get_best_crowded_organism(org, sample, environment))
+    return new_population
+
 def get_best_organism(pop, environment):
     best_org = pop[0]
     for org in pop:
-        old_environment = org.environment
-        org.environment = environment
-        best_org.environment = environment
-        if org > best_org:
+        if org.is_better_than(best_org, environment):
             best_org = org
-        org.environment = old_environment
-        best_org.environment = old_environment
     return best_org
+
+def get_best_crowded_organism(new_org, sample, environment):
+    most_similar = sample[0]
+    min_distance = float("inf")
+    for org in sample:
+        curr_dist = org.distance(new_org, environment)
+        if curr_dist < min_distance:
+            most_similar = org
+            min_distance = curr_dist
+    if new_org.is_better_than(most_similar, environment):
+        return new_org
+    return most_similar
 
 def get_next_generation(population, environment):
     new_population = get_mutated_population(population)
-    new_new_population = get_selected_population_soft(new_population, environment)
+    if CROWDING:
+        new_new_population = get_crowded_population(new_population, population, environment)
+    else:
+        new_new_population = get_selected_population(new_population, environment)
     return new_new_population
 
 def print_status(generation, population, environment):
@@ -76,7 +94,6 @@ def print_status(generation, population, environment):
     print("Gen = {}  Pop = {}  Fit = {}".format(generation, population, average_fitness))
 
 def evolve_population(reference_environment, alternative_environment):
-    """Currently only works for vector orgs."""    
     current_fitness_list = [("Generation", "Average_Fitness", 
                     "Standard_Deviation")]
     current_fitness_best = [("Generation", "Best_fitness", "Best_org")]
@@ -149,6 +166,8 @@ def set_global_variables(config):
     TOURNAMENT_SIZE = config.getint("DEFAULT", "tournament_size")
     global ORG_TYPE
     ORG_TYPE = config.get("DEFAULT", "org_type")
+    global CROWDING
+    CROWDING = eval(config.get("DEFAULT", "crowding"))
     if ORG_TYPE == "string":
         string_org.TARGET_STRING = config.get("DEFAULT", "target_string")
         string_org.LETTERS = config.get("DEFAULT", "letters")
@@ -159,6 +178,12 @@ def set_global_variables(config):
             FITNESS_FUNCTION_TYPE = ff.sphere_function
         elif fitness_function_type_str == "rosenbrock":
             FITNESS_FUNCTION_TYPE = ff.rosenbrock_function
+        elif fitness_function_type_str == "rana":
+            FITNESS_FUNCTION_TYPE = ff.rana_function
+        elif fitness_function_type_str == "deceptive":
+            FITNESS_FUNCTION_TYPE = ff.deceptive
+        elif fitness_function_type_str == "schafferf7":
+            FITNESS_FUNCTION_TYPE = ff.schafferF7
         else:
             raise AssertionError("Unknown (but needed) function type (i.e. sphere)")
         real_value_vector_org.LENGTH = config.getint("DEFAULT", "length")
@@ -183,10 +208,14 @@ def save_string_to_file(string, filename):
         f.write(string)
 
 def generate_data():
-    fitness_function = ff.Fitness_Function(FITNESS_FUNCTION_TYPE, 0, real_value_vector_org.LENGTH)
-    fitness_function.create_fitness2(ALTERNATE_ENVIRONMENT_CORR)
-    reference_environment  = fitness_function.fitness1_fitness
-    alternative_environment  = fitness_function.fitness2_fitness
+    if ORG_TYPE == "vector":
+        fitness_function = ff.Fitness_Function(FITNESS_FUNCTION_TYPE, 0, real_value_vector_org.LENGTH)
+        fitness_function.create_fitness2(ALTERNATE_ENVIRONMENT_CORR)
+        reference_environment  = fitness_function.fitness1_fitness
+        alternative_environment  = fitness_function.fitness2_fitness
+    elif ORG_TYPE == "string":
+        reference_environment  = string_org.default_environment
+        alternative_environment  = string_org.hash_environment
 
     experienced_fits, experienced_bests, reference_fits, reference_bests = evolve_population(
         reference_environment, alternative_environment)
@@ -213,7 +242,8 @@ def generate_data():
     save_table_to_file(reference_fits, reference_filename)
     save_table_to_file(experienced_bests, experienced_best_filename)
     save_table_to_file(reference_bests, reference_best_filename)
-    save_string_to_file(str(fitness_function.correlation()), corr_filename)
+    if ORG_TYPE == "vector":
+        save_string_to_file(str(fitness_function.correlation()), corr_filename)
 
     start_time = datetime.datetime.fromtimestamp(START_TIME)
     end_time = datetime.datetime.now()

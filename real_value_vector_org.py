@@ -1,12 +1,11 @@
 import random
-from fitness_function import Fitness_Function, sphere_function, MUTATION_EFFECT_SIZE
-from functools import total_ordering
+from math import sqrt
 
 LENGTH = None
 RANGE_MIN = None
 RANGE_MAX = None
+MUTATION_EFFECT_SIZE = None
 
-@total_ordering
 class RealValueVectorOrg(object):
     """
     this is a class that represents organisms as a real value vector
@@ -16,31 +15,24 @@ class RealValueVectorOrg(object):
 
     def __init__(self, genotype=None):
         if genotype is None:
-            genotype = create_random_genotype()
-        assert LENGTH == len(genotype)
+            genotype = _create_random_genotype()
         self.genotype = genotype
-        self.environment = None
 
-    def fitness(self, environment=None):
-        if environment is None:
-            if self.environment is None:
-                raise AssertionError("Can't call fitness unless you set an environment")
-            environment = self.environment
+    def fitness(self, environment):
         return environment(self.genotype)
 
     def get_mutant(self):
-        return RealValueVectorOrg(get_mutated_genotype(self.genotype))
+        
+        return RealValueVectorOrg(_get_mutated_genotype(self.genotype, MUTATION_EFFECT_SIZE))
 
     def get_clone(self):
         return RealValueVectorOrg(self.genotype)
 
-    def __lt__(self, other):
-        if self.fitness(self.environment) > other.fitness(self.environment):
-            return True
-        return self.genotype < other.genotype
-
     def __eq__(self, other):
         return self.genotype == other.genotype
+
+    def __ne__(self, other):
+        return not self == other
 
     def __str__(self):
         return "RealValueVectorOrg({})".format(self.genotype)
@@ -48,20 +40,30 @@ class RealValueVectorOrg(object):
     def __repr__(self):
         return str(self)
 
-def get_mutated_genotype(genotype):
+    def is_better_than(self, other, environment):
+        return self.fitness(environment) < other.fitness(environment)
+
+    def distance(self, other, environment):
+        dist = 0.0
+        for i in range(len(self.genotype)):
+            dist += (self.genotype[i] - other.genotype[i])**2
+
+        return sqrt(dist)
+
+def _get_mutated_genotype(genotype, effect_size):
     "Mutates one locus in organism at random"
     mut_location = random.randrange(len(genotype))
-    delta = random.normalvariate(0, MUTATION_EFFECT_SIZE)
+    delta = random.normalvariate(0, effect_size)
     mutant_value = genotype[mut_location] + delta
 
     mutant = genotype[:]
-    mutant[mut_location] = wrap_around(mutant_value)            
+    mutant[mut_location] = _wrap_around(mutant_value, RANGE_MIN, RANGE_MAX)            
     return mutant
 
-def wrap_around(value):
-    width = RANGE_MAX - RANGE_MIN
-    while value < RANGE_MIN or value > RANGE_MAX:
-        if value < RANGE_MIN:
+def _wrap_around(value, min_, max_):
+    width = max_ - min_
+    while value < min_ or value > max_:
+        if value < min_:
             value += width
         else:
             value -= width
