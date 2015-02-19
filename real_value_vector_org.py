@@ -68,7 +68,10 @@ def _wrap_around(value, min_, max_):
             value -= width
     return value
 
-def _create_random_genotype():
+def create_random_genotype():
+    assert (LENGTH is not None and 
+            RANGE_MIN is not None and 
+            RANGE_MAX is not None), "Module variable must be initialized before use"
     genotype = []
     for _ in range(LENGTH):
         genotype.append(random.uniform(RANGE_MIN, RANGE_MAX))
