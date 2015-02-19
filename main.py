@@ -28,6 +28,9 @@ START_TIME = None
 CROWDING = False
 
 def create_initial_population():
+    """
+    Create a starting population by appending randomly generated organisms to an empty list.
+    """
     population = []
     for _ in range(NUMBER_OF_ORGANISMS):
         if ORG_TYPE == "string":
@@ -39,6 +42,9 @@ def create_initial_population():
 
 
 def get_mutated_population(population):
+    """
+    Return a new population with a percentage of organisms mutated based on the mutation rate.
+    """
     new_population = []
     for org in population:
         if random.random() < MUTATION_RATE:
@@ -49,6 +55,10 @@ def get_mutated_population(population):
     return new_population
 
 def get_selected_population(population, environment):
+    """
+    Select a number of organisms based on tournament size, pick the best one, and append it to
+    a new population. Do this until the population is full.
+    """
     new_population = []
     for _ in range(NUMBER_OF_ORGANISMS):
         orgs = [random.choice(population) for _ in range(TOURNAMENT_SIZE)]
@@ -187,9 +197,9 @@ def set_global_variables(config):
         else:
             raise AssertionError("Unknown (but needed) function type (i.e. sphere)")
         real_value_vector_org.LENGTH = config.getint("DEFAULT", "length")
-        range_minimum = config.getint("DEFAULT", "range_minimum")
+        range_minimum = config.getfloat("DEFAULT", "range_minimum")
         real_value_vector_org.RANGE_MIN = range_minimum
-        range_maximum = config.getint("DEFAULT", "range_maximum")
+        range_maximum = config.getfloat("DEFAULT", "range_maximum")
         real_value_vector_org.RANGE_MAX = range_maximum
         mut_effect_size = config.getfloat("DEFAULT", "mutation_effect_size")
         ff.MUTATION_EFFECT_SIZE = mut_effect_size
@@ -209,7 +219,7 @@ def save_string_to_file(string, filename):
 
 def generate_data():
     if ORG_TYPE == "vector":
-        fitness_function = ff.Fitness_Function(FITNESS_FUNCTION_TYPE, 0, real_value_vector_org.LENGTH)
+        fitness_function = ff.Fitness_Function(FITNESS_FUNCTION_TYPE, real_value_vector_org.LENGTH)
         fitness_function.create_fitness2(ALTERNATE_ENVIRONMENT_CORR)
         reference_environment  = fitness_function.fitness1_fitness
         alternative_environment  = fitness_function.fitness2_fitness

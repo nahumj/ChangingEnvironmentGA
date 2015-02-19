@@ -12,49 +12,32 @@ f = Fitness_Function(sphere_function, 0, 2)
 fitness = f.evaluate(solution)
 """
 MUTATION_EFFECT_SIZE = 50#None
-MOD_SAMPLES = 32.0 #How sparse should the set of refernce points be
+MOD_SAMPLES = 32 #How sparse should the set of refernce points be
 CHANGE_MODIFIER = 50.0 #cludgey multiplier to get environment 2 to be in 
                        #the right ball-park of similarity to environment 1
 RANA_WEIGHTS = None #somehow we need to give a constant set of weights to 
                     #the Rana function
 
-def main():
-    ff = Fitness_Function(sphere_function, 0, 2)
-    ff.create_fitness2(.8)
-    for i in range(10):
-        print ff.correlation(5000)
-    #print fitness2([1,1])
-    #plotFitnessFunction(ff.fitness1)
-    #plotFitnessFunction(ff.fitness2)
-    #print ff.correlation()
 
-def sphere_function(vals, modgen):
+def flat_function(vals):
+    """Takes in vals so as not to break when called."""
+    return 0
+
+def sphere_function(vals):
     """
     A very easy test function
     Parameters:
            vals - a list specifying the point in N-dimensionsla space to be
                   evaluated
-           modegen - a function 
     """
-    total = 0.0
-    for i in range(len(vals)):
-        if modgen != None:
-            total += (vals[i]+modgen(vals[i]))*(vals[i]+modgen(vals[i]))
-        else:
-            total += (vals[i])*(vals[i])
-    return total
+    return sum(val**2 for val in vals)
 
-def rosenbrock_function(vals, modgen):
-    total = 0.0
-    if modgen != None:
-        for i in range(len(vals)):
-            vals[i] += modgen(vals[i])
-    for i in range(len(vals)-1):
-        total += 100*(vals[i+1] - vals[i]**2)**2 + (vals[i]-1)**2
-    return total
+def rosenbrock_function(vals):
 
-def rana_function(vals, modgen):
+    return sum(100*(vals[i+1] - vals[i]**2)**2 + (vals[i]-1)**2 
+               for i in range(len(vals)-1))
 
+def rana_function(vals):
     total = 0.0
     for i in range(len(vals)):
         x = vals[i]
@@ -63,40 +46,31 @@ def rana_function(vals, modgen):
         else:
             y = vals[i+1]
 
-        if modgen != None:
-            x += modgen(vals[i])
-            y += modgen(vals[i])
-
         #Equation from 
         #http://www.cs.unm.edu/~neal.holts/dga/benchmarkFunction/rana.html
+        global RANA_WEIGHTS
         total += RANA_WEIGHTS[i]*x*sin(sqrt(fabs(y+1-x)))* \
                  cos(sqrt(fabs(x+y+1))) + (y+1)*cos(sqrt(fabs(y+1-x)))* \
                  sin(sqrt(fabs(x+y+1)))
     return total
 
-def schafferF7(vals, modgen):
+def schafferF7(vals):
     #Equation from 
     #http://www.cs.unm.edu/~neal.holts/dga/benchmarkFunction/schafferf7.html
     total = 0.0
     normalizer = 1.0/float(len(vals))
-    if modgen != None:
-        for i in range(len(vals)):
-            vals[i] += modgen(vals[i])
     for i in range(len(vals)-1):
         si = sqrt(vals[i]**2 + vals[i+1]**2)
         total += (normalizer * sqrt(si) * (sin(50*si**0.20) + 1))**2
     return total
 
-def deceptive(vals, modgen):
+def deceptive(vals):
     #Adapted from: http://www.cs.unm.edu/~neal.holts/dga/
     #benchmarkFunction/deceptive.html
     deceptiveness = 0.20 #This is actually more like the 
                     #inverse of deceptiveness since smaller = more deceptive.
     best_fitness = 1.0
     deceptive_best = 0.7
-    if modgen != None:
-        for i in range(len(vals)):
-            vals[i] += modgen(vals[i])
     total = 0.0
     dimensions = len(vals)
     for i in range(dimensions):
@@ -114,24 +88,36 @@ def deceptive(vals, modgen):
 
 class Fitness_Function:
 
-    def __init__(self, func, optimal, arglen):
-        self.func = func
-        self.fitness1 = None
+    def __init__(self, func, arglen):
+        """
+        func = fitness function type
+        arglen = length of real value vector org
+
+        """
+        self.fitness1 = func
         self.fitness2 = None
         self.optimal = 0
         self.arglen = arglen
         self.range_ = (-512, 512)
         self.flipped = False
-        self.corr = None
-        
-        global RANA_WEIGHTS
-        RANA_WEIGHTS = [random.random() for i in range(arglen)]
-        total = sum(RANA_WEIGHTS)
-        RANA_WEIGHTS = [i/total for i in RANA_WEIGHTS]
 
-        def f1(vals):
-            return self.func(vals, None)
-        self.fitness1 = f1
+        global RANA_WEIGHTS
+        if RANA_WEIGHTS is not None:
+            RANA_WEIGHTS = [random.random() for i in range(len(vals))]
+            total = sum(RANA_WEIGHTS)
+            RANA_WEIGHTS = [i/total for i in RANA_WEIGHTS]
+        
+    def _apply_modgen_to_vals(self, vals, modgen):
+        """
+        Apply modgen to each val in vals.
+        """
+        def put_in_range(val):
+            if val < self.range_[0]:
+                return self.range_[0]
+            if val > self.range_[1]:
+                return self.range_[1]
+            return val
+        return [put_in_range(vals[i] + modgen(vals[i])) for i in range(len(vals))]
 
     def set_flipped(self, value):
         self.flipped = value
@@ -171,24 +157,34 @@ class Fitness_Function:
             vals.append(self.fitness1(solution))
         return stats.tstd(vals)
 
+    def create_mods(self):
+        """
+        Initializes the self.mods dictionary with the pertubations that will be applied to each value.
+        """
+        sd = MUTATION_EFFECT_SIZE  * CHANGE_MODIFIER * (1 - abs(self.corr))
+        return [random.normalvariate(0, sd) for _ in range(MOD_SAMPLES + 1)]
+
     def random_mod(self, val):
-
+        """
+        random_mod is supposed to skew each value
+        global variable MOD_SAMPLES is the granularity by which the values are skewed
+        interval is the size of the range divided by the granularity
+        shifted_val is the val's position in the granularity
+        """
         interval = float(self.range_[1] - self.range_[0])/MOD_SAMPLES
-        val  =  (self.range_[0]*-1)+val/interval
+        shifted_val = ((self.range_[0]*-1) + val) / interval
 
-        if ceil(val) not in self.mods:
-            self.mods[ceil(val)] = random.normalvariate(0, MUTATION_EFFECT_SIZE  * CHANGE_MODIFIER * (1 - abs(self.corr)))
-        upper = self.mods[ceil(val)]
-        if floor(val) not in self.mods:
-            self.mods[floor(val)] = random.normalvariate(0, MUTATION_EFFECT_SIZE  * CHANGE_MODIFIER * (1 - abs(self.corr)))
-        lower = self.mods[floor(val)]
-        #print self.corr
-        #print self.mods
+        ceil_val = int(ceil(shifted_val))
+        floor_val = int(floor(shifted_val))
+
+        sd = MUTATION_EFFECT_SIZE  * CHANGE_MODIFIER * (1 - abs(self.corr))
+
+        upper = self.mods[ceil_val]
+        lower = self.mods[floor_val]
         if upper == lower:
             return upper
-        slope = (upper-lower)/(ceil(val) - floor(val))
-        result = slope*(val - floor(val)) + lower
-
+        slope = (upper-lower)/float(ceil_val - floor_val)
+        result = slope*(shifted_val - floor_val) + lower
         return result
 
     def set_mods_array(self):
@@ -196,9 +192,6 @@ class Fitness_Function:
         #self.mods = np.fromfunction(np.vectorize(self.random_mod), dims)
         self.mods = np.random.randn(*dims)*self.sd()*10*(1-abs(self.corr))
     
-    def set_mods_dict(self):
-        self.mods = {}
-
     def get_mod(self, point):
         print point
         """
@@ -264,29 +257,15 @@ class Fitness_Function:
         return total / lem(point)
 
     def create_fitness2(self, corr):
+        def fitness2(vals):
+            new_vals = self._apply_modgen_to_vals(vals, self.random_mod)
+            return self.fitness1(new_vals)
+
         self.corr = corr
-        self.set_mods_dict()
-        fitness2 = self.create_alternate_fitness_function()
+        self.mods = self.create_mods()
         if corr < 0:
             fitness2 = self.invert(fitness2)
         self.fitness2 = fitness2
-
-    def create_alternate_fitness_function(self):
-        def fitness2(vals):
-            #original = self.fitness1(vals)
-            #print "original", original
-            #print "vals", vals
-            #print "mods", self.mods[0][0]
-            #print "get", self.get_mod(vals)
-            #print self.func(vals, self.random_mod)
-            return self.func(vals, self.random_mod)
-                
-            #return original + self.get_mod(vals)
-            #except Exception as e:
-            #   print "Uhoh", e
-            #    #return original + self.mods
-        return fitness2
-        
 
     def invert(self, function):
         def inverted(vals):

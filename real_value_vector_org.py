@@ -21,8 +21,7 @@ class RealValueVectorOrg(object):
     def fitness(self, environment):
         return environment(self.genotype)
 
-    def get_mutant(self):
-        
+    def get_mutant(self):        
         return RealValueVectorOrg(_get_mutated_genotype(self.genotype, MUTATION_EFFECT_SIZE))
 
     def get_clone(self):
