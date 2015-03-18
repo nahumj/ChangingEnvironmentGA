@@ -17,3 +17,7 @@ test:
 coverage:
 	coverage run -m unittest discover
 	coverage report -m
+
+profile:
+	-@rm -r profile_junk_data
+	python profile.py

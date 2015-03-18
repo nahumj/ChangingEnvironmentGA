@@ -10,11 +10,7 @@ def convert_config_file_name_to_job(file_name, output_dir_base):
 common = """
 #!/bin/bash -login
 
-<<<<<<< HEAD
 #PBS -l walltime=72:00:00
-=======
-#PBS -l walltime=20:00:00
->>>>>>> riley/master
 #PBS -l nodes=1:ppn=1
 #PBS -l mem=250mb
 #PBS -N changing_environment_test

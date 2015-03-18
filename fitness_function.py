@@ -33,9 +33,15 @@ def sphere_function(vals):
     return sum(val**2 for val in vals)
 
 def rosenbrock_function(vals):
-
     return sum(100*(vals[i+1] - vals[i]**2)**2 + (vals[i]-1)**2 
                for i in range(len(vals)-1))
+
+def initialize_rana_weights(vals):
+    global RANA_WEIGHTS
+    RANA_WEIGHTS = [random.random() for i in range(len(vals))]
+    total = sum(RANA_WEIGHTS)
+    RANA_WEIGHTS = [i/total for i in RANA_WEIGHTS]
+
 
 def rana_function(vals):
     total = 0.0
@@ -48,7 +54,11 @@ def rana_function(vals):
 
         #Equation from 
         #http://www.cs.unm.edu/~neal.holts/dga/benchmarkFunction/rana.html
+        
         global RANA_WEIGHTS
+        if RANA_WEIGHTS is None:
+            initialize_rana_weights(vals)
+
         total += RANA_WEIGHTS[i]*x*sin(sqrt(fabs(y+1-x)))* \
                  cos(sqrt(fabs(x+y+1))) + (y+1)*cos(sqrt(fabs(y+1-x)))* \
                  sin(sqrt(fabs(x+y+1)))
@@ -101,12 +111,6 @@ class Fitness_Function:
         self.range_ = (-512, 512)
         self.flipped = False
 
-        global RANA_WEIGHTS
-        if RANA_WEIGHTS is not None:
-            RANA_WEIGHTS = [random.random() for i in range(len(vals))]
-            total = sum(RANA_WEIGHTS)
-            RANA_WEIGHTS = [i/total for i in RANA_WEIGHTS]
-        
     def _apply_modgen_to_vals(self, vals, modgen):
         """
         Apply modgen to each val in vals.
@@ -119,21 +123,13 @@ class Fitness_Function:
             return val
         return [put_in_range(vals[i] + modgen(vals[i])) for i in range(len(vals))]
 
-    def set_flipped(self, value):
-        self.flipped = value
+    def fitness1_fitness(self, vals):
+        return self.fitness1(vals)
 
-    def evaluate(self, solution):
-        if self.flipped:
-            return self.fitness2(solution)
-        return self.fitness1(solution)
-
-    def fitness1_fitness(self, solution):
-        return self.fitness1(solution)
-
-    def fitness2_fitness(self, solution):
+    def fitness2_fitness(self, vals):
         if self.fitness2 is None:
             raise AssertionError("Need to initialize fitness2 first")
-        return self.fitness2(solution)
+        return self.fitness2(vals)
 
     def correlation(self, samples=5000):
         vals1 = []
@@ -186,75 +182,6 @@ class Fitness_Function:
         slope = (upper-lower)/float(ceil_val - floor_val)
         result = slope*(shifted_val - floor_val) + lower
         return result
-
-    def set_mods_array(self):
-        dims = [MOD_SAMPLES for i in range(self.arglen)]
-        #self.mods = np.fromfunction(np.vectorize(self.random_mod), dims)
-        self.mods = np.random.randn(*dims)*self.sd()*10*(1-abs(self.corr))
-    
-    def get_mod(self, point):
-        print point
-        """
-        points = []
-        values = []
-        for combo in itertools.product(range(len(self.mods)), range(len(self.mods))):
-            points.append(combo)
-            values.append(self.mods.item(combo))
-
-        ix = []
-        for combo in itertools.product(*point):
-            ix.append(combo)
-        print ix
-        print np.shape(points), np.shape(values), np.shape(ix)
-        return scipy.interpolate.griddata(points, self.mods, ix)
-        """
-        interval = float(self.range_[1] - self.range_[0])/MOD_SAMPLES
-        opts = []
-        for i in range(len(point)):
-            opts.append([floor(point[i]), ceil(point[i])])
-
-            if opts[i][1] >= MOD_SAMPLES :
-                opts[i].pop(1)
-            elif opts[i][0] < 0:
-                opts[i].pop(0)
-        
-        points = []
-        values = []
-        for combo in itertools.product(*opts):
-            points.append(combo)
-            try: #handle generator mode
-                values.append(self.random_mod(combo))
-            except Exception as e:
-                print e, "not dict"
-                exit(1)
-            #values.append(self.mods.item(combo))
-
-        """
-        for i in range(1000):
-            test_point = []
-            for opt in opts:
-                test_point.append(random.choice(opt))
-            points.append(test_point)
-            values.append(self.random_mod(tuple(test_point)))
-        """
-        #print "Values", values
-
-        #try: #various things could go wrong with interpolation
-            #self.naive_interpolate
-        print "INTERPOLATION:", scipy.interpolate.griddata(points, values, tuple(point), method="nearest")
-        return scipy.interpolate.griddata(points, values, tuple(point), method="nearest")
-        #except:
-        #    "interpolation failed"
-        #    return values[0]
-        
-    def naive_interpolate(self, boundaries, point):
-        total = 0.0
-        for i in range(len(boundaries)):
-            b = boundaries[i]
-            slope = (b[1][0] - b[0][0])/(b[1][1] - b[0][1])
-            total += slope*(point[i] - b[0][0]) + b[0][1]
-
-        return total / lem(point)
 
     def create_fitness2(self, corr):
         def fitness2(vals):
