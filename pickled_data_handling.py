@@ -7,11 +7,12 @@ mpl.use('Agg')
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 #import scipy.stats as stats
+import cPickle
 
 def main():
-    test_dir = "length_100_2015_May_26"
+    test_dir = "length_100_2015_May_27"
     data = get_data(test_dir)
-    landscape = "rosenbrock"
+    landscape = "schafferf7"
     plot_aggregate_over_time(data, landscape, test_dir)
     plot_stddev_over_time(data, landscape, test_dir)
     plot_average_final_fitness(data, landscape, test_dir)
@@ -50,6 +51,15 @@ def new_way_to_get_desired_data(common_dir, desired_data):
     return data
 
 def get_data(common_dir):
+    file_name = common_dir + "/pickled_data"
+    try:
+        data_file = open(file_name, "r")
+        data = pickle.load(data_file)
+        data_file.close()
+        return data
+    except:
+        pass
+    data_file = open(file_name, "w")
     #Make a new dictionary
     data = {}
     #For each sub directory...
@@ -77,6 +87,8 @@ def get_data(common_dir):
         df = df.merge(pd.read_csv(common_dir+"/"+sub_dir+"/reference_best_fitnesses.csv"), on="Generation")
         #Append the correlation and dataframe to the associated list
         data[config].append([corr, df])
+    pickle.dump(data, data_file)
+    data_file.close()
     return data
 
 #Not corrected for use with the new data

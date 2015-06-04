@@ -198,6 +198,3 @@ class Fitness_Function:
         def inverted(vals):
             return function(vals) * -1
         return inverted
-
-if __name__ == "__main__":
-    main()

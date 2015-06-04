@@ -5,12 +5,12 @@ from mpl_toolkits.mplot3d import Axes3D
 from fitness_function import *
 
 def main():
-    ff = Fitness_Function(schafferF7, 0, 2)
-    ff.create_fitness2(.99)
-    ff.set_flipped(True)
+    ff = Fitness_Function(schafferF7, 2)
+    ff.create_fitness2(0.99)
+    #ff.set_flipped(True)
     #print fitness2([1,1])
-    #plotFitnessFunction(ff.fitness1)
-    plotFitnessFunction(ff.fitness2)
+    #plotFitnessFunction(ff.get_fitness1())
+    plotFitnessFunction(ff.get_fitness2())
     print ff.correlation()
 
 def plotFitnessFunction(function):
